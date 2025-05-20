@@ -2,7 +2,7 @@ publico clase ProgramaPrincipal {
 
     publico entero main (){
         entero contador = 0;
-        cadena prueba;
+        cadena prueba = 12;
 
         mientras (contador < 5) {
             imprimir("Contador: " + contador);

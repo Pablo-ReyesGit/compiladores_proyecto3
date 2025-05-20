@@ -17,6 +17,10 @@ public class Simbolo {
         this.acceso = acceso;
     }
 
+    public Simbolo() {
+
+    }
+
     // Getters
     public String getNombre() { return nombre; }
     public String getTipo() { return tipo; }
