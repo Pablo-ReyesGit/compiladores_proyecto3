@@ -1,0 +1,49 @@
+publico clase ProgramaPrincipal {
+
+    publico entero main (){
+        entero contador = 0;
+        cadena prueba;
+
+        mientras (contador < 5) {
+            imprimir("Contador: " + contador);
+            contador = contador + 1;
+        }
+
+        para (entero i = 0; i == 0; i = i + 1) {
+            imprimir("Iteracion: " + i);
+        }
+
+        hacer {
+            imprimir("Este es un ciclo hacer-mientras.");
+        } mientras (falso);
+
+        si (contador == 5) {
+            imprimir("Contador es cinco");
+        } si_no {
+            imprimir("Contador no es cinco");
+        }
+
+        switch (contador) {
+            caso 3:
+                imprimir("Es tres");
+            caso 5:
+                imprimir("Es cinco");
+            defecto:
+                imprimir("Otro valor");
+        }
+
+        metodoAuxiliar("mensaje", 42, verdadero);
+    }
+
+    privado flotante metodoAuxiliar(cadena mensaje, entero numero, booleano flag) {
+        imprimir(mensaje);
+        si (flag) {
+            imprimir("Flag es verdadero");
+        }
+        retorno 3.14;
+    }
+
+    protegido caracter obtenerInicial() {
+        retorno 'A';
+    }
+}

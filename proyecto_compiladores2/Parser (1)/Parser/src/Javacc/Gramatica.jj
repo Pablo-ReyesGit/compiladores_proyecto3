@@ -1,0 +1,643 @@
+
+options {
+    IGNORE_CASE = true;
+    STATIC = false;
+
+}
+
+
+PARSER_BEGIN(Gramatica)
+package org.example;
+import org.example.TokenAsignaciones;
+public class Gramatica {
+    public static void main(String[] args) throws ParseException {
+        Gramatica parser = new Gramatica(System.in);
+        TokenAsignaciones.SetTables();
+        parser.Inicio();  // Llamada al método 'inicio()' generado
+    }
+}
+
+PARSER_END(Gramatica)
+
+void Inicio()  :
+{}
+{
+    {
+            logProduccion("Inicio");
+        }
+    (Clase() | sentencia())* <EOF>
+}
+
+void Clase() :
+{}
+{
+    {
+        logProduccion("Clase");
+    }
+    try {
+    (Modificador())* <CLASE> <IDENTIFICADOR> <LLAVE_IZQ>
+        (Metodo() | sentencia())*
+    <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+JAVACODE
+void logProduccion(String nombreProduccion) {
+    Token t = getToken(1);
+    System.out.println("Entrando a " + nombreProduccion + " en línea: " + t.beginLine + ", columna: " + t.beginColumn);
+}
+
+JAVACODE
+void recuperarError(int kind)
+{
+ParseException e = generateParseException();
+         System.err.println(e.toString());
+         ReporteHTML.agregarError(e.toString());
+         Token t;
+         do {
+             t = getNextToken();
+         } while (t.kind != kind && t.kind != EOF);
+    }
+
+JAVACODE
+void recuperarErrorLexico() {
+    Token t;
+    do {
+        t = getNextToken();
+    } while (t.kind != PUNTO_COMA && t.kind != LLAVE_DER && t.kind != EOF);
+}
+
+
+
+void Modificador() :
+{}
+{
+{
+logProduccion("Modificador");
+}
+    try {
+    <PUBLICO> | <PRIVADO> | <PROTEGIDO> | <ESTATICO>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void Metodo() :
+{}
+{
+    try {
+    Modificador() tipo_de_dato() <IDENTIFICADOR>
+    <PARENT_IZQ> ( Parametros() )? <PARENT_DER> Bloque()
+    } catch (ParseException e) {
+                recuperarError(PARENT_DER);
+        } catch (TokenMgrError e) {
+                   recuperarErrorLexico();
+              }
+}
+
+void Parametros() :
+{}
+{
+{
+logProduccion("Parametros");
+}
+    try {
+    tipo_de_dato() <IDENTIFICADOR> (<ARRAY_IZQ> <ARRAY_DER>)? (<COMA> tipo_de_dato() <IDENTIFICADOR> (<ARRAY_IZQ> <ARRAY_DER>)?)*
+    } catch (ParseException e) {
+            recuperarError(ARRAY_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void sentencia() :
+{}
+{
+{
+logProduccion("sentencia");
+}
+    try {
+        declaracion()
+      | asignacion()
+      | si()
+      | mientras()
+      | para()
+      | imprimir()
+      | Metodo()
+      | Bloque()
+      | hacer()
+      | seleccion()
+    } catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+         recuperarErrorLexico();
+    }
+
+}
+
+void Bloque() :
+{}
+{
+{
+logProduccion("Bloque");
+}
+    try{
+    <LLAVE_IZQ> (declaracion() | sentencia())*  <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void asignacion() :
+{
+    Token id;
+}
+{
+{
+logProduccion("asignacion");
+}
+    try {
+        id = <IDENTIFICADOR> <ASIGNACION> expresion() <PUNTO_COMA>
+        {
+            // Aquí decides qué hacer. Ejemplo:
+            System.out.println("Asignación registrada de: " + id.image);
+        }
+    } catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+        recuperarErrorLexico();
+    }
+}
+
+void imprimir() :
+{}
+{
+{
+logProduccion("imprimir");
+}
+    try {
+    <IMPRIMIR> <PARENT_IZQ> expresion() <PARENT_DER> <PUNTO_COMA>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void si():
+{}
+{
+{
+logProduccion("si");
+}
+    try {
+    <SI> <PARENT_IZQ> expresion() <PARENT_DER> cuerpo_si()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_si()  :
+{}
+{
+{
+logProduccion("cuerpo_si");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    [ <SI_NO> <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER> ]
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void mientras() :
+{}
+{
+{
+logProduccion("mientras");
+}
+    try {
+    <MIENTRAS> <PARENT_IZQ> expresion() <PARENT_DER> cuerpo_mientras()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_mientras() :
+{}
+{
+{
+logProduccion("cuerpo_mientras");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void para() :
+{}
+{
+{
+logProduccion("para");
+}
+    try {
+    <PARA> <PARENT_IZQ> asignacion() <PUNTO_COMA> expresion() <PUNTO_COMA> asignacion() <PARENT_DER> cuerpo_para()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_para() :
+{}
+{
+{
+logProduccion("cuerpo_para");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+ } catch (ParseException e) {
+         recuperarError(LLAVE_DER);
+ } catch (TokenMgrError e) {
+            recuperarErrorLexico();
+       }
+}
+
+void hacer() :
+{}
+{
+{
+logProduccion("hacer");
+}
+    try {
+    <HACER> cuerpo_hacer() <MIENTRAS> <PARENT_IZQ> expresion() <PARENT_DER> <PUNTO_COMA>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    }catch (TokenMgrError e) {
+              recuperarErrorLexico();
+         }
+}
+
+void cuerpo_hacer() :
+{}
+{
+{
+logProduccion("cuerpo_hacer");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void seleccion():
+{}
+{
+{
+logProduccion("seleccion");
+}
+    try {
+    <SWITCH> <PARENT_IZQ> expresion() <PARENT_DER>
+    <LLAVE_IZQ>
+        (
+            <CASO> expresion() <DOS_PUNTOS>
+            (sentencia())*
+        )*
+        [ <DEFECTO> <DOS_PUNTOS> (sentencia())* ]
+    <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void SITUACION() :
+{}
+{
+
+    <CASO> expresion() <DOS_PUNTOS> ( sentencia() )*
+
+}
+
+void declaracion():
+{
+    Token tipoToken;
+    Token id = null;
+    int tipo = -1;
+}
+{
+    {
+        logProduccion("declaracion");
+    }
+
+    try {
+        (
+            tipoToken = <ENTERO>   { tipo = 39; } |
+            tipoToken = <DOBLE>    { tipo = 26; } |
+            tipoToken = <CARACTER> { tipo = 20; } |
+            tipoToken = <CADENA>   { tipo = 57; } |
+            tipoToken = <BOOLEANO> { tipo = 15; }
+        )
+        id = <IDENTIFICADOR>
+        <PUNTO_COMA>
+        {
+            TokenAsignaciones.InsertarSimbolo(id, tipo);
+            System.out.println("inserto " + tipoToken.image + " en la tabla de simbolos: " + id.image);
+        }
+    } catch (ParseException e) {
+        if (id != null && tipo != -1) {
+            TokenAsignaciones.InsertarSimbolo(id, tipo);
+            System.out.println("Registro parcial tras error: " + id.image);
+        }
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+        recuperarErrorLexico();
+    }
+}
+
+void tipo_de_dato() :
+{}
+{
+{
+logProduccion("tipo_de_dato");
+}
+try{
+
+    <ENTERO>
+|   <FLOTANTE>
+|   <CADENA>
+|   <BOOLEANO>
+|   <CARACTER>
+} catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+} catch (TokenMgrError e) {
+           recuperarErrorLexico();
+      }
+
+}
+
+void expresion() :
+{}
+{
+{
+logProduccion("expresion");
+}
+    try{
+    operando() ( operador() operando() )*
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void operando() :
+{}
+{
+{
+logProduccion("operando");
+}
+    try {
+    <IDENTIFICADOR>
+|   <ENTERO_LITERAL>
+|   <CADENA_LITERAL>
+|   <VERDADERO> | <FALSO>
+|   <PARENT_IZQ> expresion() <PARENT_DER>
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void operador() :
+{}
+{
+{
+logProduccion("operador");
+}
+    try {
+    <SUMA> | <RESTA> | <MULTI> | <DIVI> | <MODULO>
+|   <IGUAL_QUE> | <NO_IGUAL_QUE> | <MENOR_QUE> | <MAYOR_QUE> | <MENOR_IGUAL> | <MAYOR_IGUAL>
+|   <AND_LOGICA> | <OR> | <NEGACION> | <ASIGNACION>
+    } catch (ParseException e) {
+            recuperarError(ASIGNACION);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+/* Analizador léxico para Java */
+
+SKIP :  /* secuencias de escape */
+{
+    " "
+|   "\r"
+|   "\t"
+|   "\n"
+|   "\b"
+|   "\f"
+|   "\""
+|   "\'"
+|   "\\"
+}
+
+SKIP : /* Comentarios de bloque */
+{
+    "/*" : DentroComentario
+}
+
+<DentroComentario> SKIP :
+{
+    "*/" : DEFAULT
+}
+
+<DentroComentario> MORE :
+{
+    <~["*"]> // Cualquier cosa que no sea el cierre del comentario.
+}
+
+/* Palabras Reservadas */
+TOKEN :
+{
+  <ABSTRACTO: "abstracto">
+| <AFIRMAR: "afirmar">
+| <BOOLEANO: "booleano">
+| <ROMPER: "romper">
+| <BYTE: "byte">
+| <CASO: "caso">
+| <CAPTURAR: "capturar">
+| <CARACTER: "caracter">
+| <CLASE: "clase">
+| <CONSTANTE: "constante">
+| <CONTINUAR: "continuar">
+| <POR_DEFECTO: "por_defecto">
+| <HACER: "hacer">
+| <DOBLE: "doble">
+| <SI_NO: "si_no">
+| <ENUMERAR: "enumerar">
+| <EXTENDER: "extender">
+| <FINAL: "final">
+| <FINALMENTE: "finalmente">
+| <FLOTANTE: "flotante">
+| <PARA: "para">
+| <IR_A: "ir_a">
+| <SI: "si">
+| <IMPLEMENTAR: "implementar">
+| <IMPORTAR: "importar">
+| <INSTANCIAR: "instanciar">
+| <ENTERO: "entero">
+| <INTERFAZ: "interfaz">
+| <LARGO: "largo">
+| <PRINCIPAL: "principal">
+| <NATIVO: "nativo">
+| <NUEVO: "nuevo">
+| <AFUERA: "afuera">
+| <PAQUETE: "paquete">
+| <PRIVADO: "privado">
+| <PROTEGIDO: "protegido">
+| <PUBLICO: "publico">
+| <IMPRIMIR: "imprimir">
+| <IMPRIMIR_LINEA: "imprimir_linea">
+| <REGRESAR: "regresar">
+| <CORTO: "corto">
+| <ESTATICO: "statico">
+| <SISTEMA: "sistema">
+| <CADENA: "cadena">
+| <SUPER: "super">
+| <ESCANEAR: "escanear">
+| <OPCIONES: "opciones">
+| <SYNCHRONIZAR: "sincronizar">
+| <ESTO: "esto">
+| <TIRAR: "tirar">
+| <TIRAR_EXCEPCION: "throws">
+| <TRANSITORIO: "transitorio">
+| <INTENTAR: "intentar">
+| <VAR: "var">
+| <VACIO: "vacio">
+| <VOLATIL: "volátil">
+| <MIENTRAS: "mientras">
+| <SWITCH: "switch">
+| <DEFECTO: "defecto">
+}
+
+/* Palabras Clave context-sensitive */
+TOKEN :
+{
+  <ABRIR: "abrir">
+| <EXPORTAR: "exportar">
+| <MODULAR: "modular">
+| <REQUERIR: "requerir">
+| <TRANSITIVO: "transitivo">
+| <ABRIRS: "abrirse">
+| <A: "a">
+| <USAR: "usar">
+| <PROVEER: "proveer">
+| <CON: "con">
+}
+
+/* Literales reservados */
+TOKEN :
+{
+  <VERDADERO: "verdadero">
+| <FALSO: "falso">
+| <NULO: "nulo">
+}
+
+/* Puntuación */
+TOKEN :
+{
+  <LLAVE_IZQ: "{">
+| <LLAVE_DER: "}">
+| <PARENT_IZQ: "(">
+| <PARENT_DER: ")">
+| <ARRAY_IZQ: "[">
+| <ARRAY_DER: "]">
+| <PUNTO_COMA: ";">
+| <PUNTO: ".">
+| <COMA: ",">
+| <DOS_PUNTOS: ":">
+}
+
+TOKEN : /* Operadores */
+{
+  // Aritméticos
+  <SUMA: "+">
+| <RESTA: "-">
+| <MULTI: "*">
+| <DIVI: "/">
+| <MODULO: "%">
+
+  // Asignación
+| <ASIGNACION: "=">
+
+  // Unarios
+| <INCREMENTO: "++">
+| <DECREMENTO: "--">
+| <COMPL_BINARIO: "~">
+
+  // Aritméticos combinados
+| <SUMA_COMBINADA: "+=">
+| <RESTA_COMBINADA: "-=">
+| <PRODUCTO_COMBINADO: "*=">
+| <DIVISION_COMBINADA: "/=">
+| <RESTO_COMBINADO: "%=">
+
+  // Relacionales
+| <IGUAL_QUE: "==">
+| <NO_IGUAL_QUE: "!=">
+| <MENOR_QUE: "<">
+| <MAYOR_QUE: ">">
+| <MENOR_IGUAL: "<=">
+| <MAYOR_IGUAL: ">=">
+
+  // Lógicos o booleanos
+| <NEGACION: "!">
+| <OR: "||">
+| <XOR: "^">
+| <AND: "&">
+| <SUMA_LOGICA: "|">
+| <AND_LOGICA: "&&">
+
+  // Bitwise
+| <DESPLAZAMIENTO_IZQ: "<<">
+| <DESPLAZAMIENTO_DER: ">>">
+}
+
+// IDENTIFICADORES
+TOKEN: // IDENTIFICADORES
+{
+<IDENTIFICADOR: (["a"-"z", "A"-"Z", "_"]) (["a"-"z", "A"-"Z", "0"-"9", "_"])*>
+}
+
+TOKEN: // Literales numéricos y cadenas
+{
+    <ENTERO_LITERAL: (["0"-"9"])+>
+|   <CADENA_LITERAL: "\"" ( "\\" | ~["\\", "\""] )* "\"" >
+
+}
+
