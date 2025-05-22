@@ -2,7 +2,7 @@ publico clase ProgramaPrincipal {
 
     publico entero main (){
         entero contador = 0;
-        cadena prueba = 12;
+        cadena prueba = "12";
 
         mientras (contador < 5) {
             imprimir("Contador: " + contador);
@@ -33,17 +33,22 @@ publico clase ProgramaPrincipal {
         }
 
         metodoAuxiliar("mensaje", 42, verdadero);
-    }
+    {
 
-    privado flotante metodoAuxiliar(cadena mensaje, entero numero, booleano flag) {
+    privado cadena metodoAuxiliar(cadena mensaje, entero numero, booleano flag) {
+
+    cadena message = mensaje;
+    entero nummer = numero;
+    booleano desicion = flag;
+    }
         imprimir(mensaje);
         si (flag) {
             imprimir("Flag es verdadero");
         }
         retorno 3.14;
-    }
+    {
 
     protegido caracter obtenerInicial() {
         retorno 'A';
-    }
+    {
 }

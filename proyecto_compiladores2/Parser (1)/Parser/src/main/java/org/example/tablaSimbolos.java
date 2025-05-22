@@ -20,13 +20,13 @@ public class tablaSimbolos {
      * @param columna La columna donde se declara el símbolo.
      * @param acceso  El tipo de acceso del símbolo.
      */
-    public void agregarSimbolo(String nombre, String tipo, String valor, int linea, int columna, String acceso) {
+    public void agregarSimbolo(String nombre, String tipo, String valor, String acceso) {
         // Validar si el símbolo ya existe
         if (simbolos.containsKey(nombre)) {
             throw new IllegalArgumentException("El símbolo '" + nombre + "' ya está declarado.");
         }
 
-        Simbolo simbolo = new Simbolo(nombre, tipo, valor, linea, columna, acceso);
+        Simbolo simbolo = new Simbolo(nombre, tipo, valor, acceso);
         simbolos.put(nombre, simbolo);
     }
 

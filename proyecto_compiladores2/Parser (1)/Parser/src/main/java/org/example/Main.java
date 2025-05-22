@@ -24,7 +24,7 @@ public class Main {
 
             System.out.println("Análisis completo. Ver reporte HTML generado.");
 
-            TokenAsignaciones.imprimirTablaSimbolos();
+            Gramatica.imprimirTablaSimbolos();
 
         } catch (IOException e) {
             System.err.println("Error al leer el archivo: " + e.getMessage());
@@ -74,9 +74,6 @@ public class Main {
         } catch (TokenMgrError e) {
             System.err.println("Error del lexer en parser: " + e.getMessage());
             ReporteHTML.agregarError("Error en lexer (parser): " + e.getMessage());
-        } catch (Exception e) {
-            System.err.println("Error general en análisis sintáctico.");
-            ReporteHTML.agregarError("Excepción general: " + e.getMessage());
         }
     }
 

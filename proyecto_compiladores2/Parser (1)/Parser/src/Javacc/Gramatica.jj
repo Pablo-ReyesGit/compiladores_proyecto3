@@ -15,19 +15,36 @@ import java.util.Stack;
 
 public class Gramatica {
     static class Simbolo2 {
-        String nombre;
-        String tipo;
-        String ambito;
-        int linea;
+        private String nombre;
+            private String tipo;
+            private String ambito;
+            private String valor; // Agregado
 
-        Simbolo2(String nombre, String tipo, String ambito) {
-            this.nombre = nombre;
-            this.tipo = tipo;
-            this.ambito = ambito;
-        }
+            public Simbolo2(String nombre, String tipo, String ambito, String valor) {
+                this.nombre = nombre;
+                this.tipo = tipo;
+                this.ambito = ambito;
+                this.valor = valor;
+            }
+
+            public String getValor() {
+                    return valor;
+                }
+
+                public void setValor(String valor) {
+                    this.valor = valor;
+                }
+
+                public String getNombre() {
+                        return nombre;
+                }
+
+                 public String getAmbito() {
+                        return ambito;
+                }
 
         public String toString() {
-            return nombre + " - " + tipo + " - " + ambito;
+            return nombre + " - " + tipo + " - " + ambito + " - " + valor;
         }
     }
 
@@ -40,6 +57,48 @@ public class Gramatica {
             System.out.println(s);
         }
     }
+
+    public String obtenerValor(String nombre, String ambito) {
+        for (Simbolo2 s : pilaAmbitos) {
+            if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                return s.getValor();
+            }
+        }
+
+        // Si no se encuentra, registrar el error
+       System.err.println("Variable no declarada o sin valor: " + nombre + " en el ámbito: " + ambito);
+
+        // Retornar valor neutro (según contexto)
+        return "0"; // o "\"\"" si esperas cadenas, o "false" si esperas booleanos
+    }
+
+    public void actualizarValor(String nombre, String ambito, String nuevoValor) {
+            for (Simbolo2 s : pilaAmbitos) {
+                if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                    s.setValor(nuevoValor);
+                    return;
+                }
+            }
+            System.out.println("⚠ Error: Variable no declarada en el ámbito: " + nombre);
+        }
+
+    public boolean contiene(String nombre, String ambito) {
+            for (Simbolo2 s : pilaAmbitos) {
+                if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean isNumeric(String str) {
+            try {
+                Integer.parseInt(str);
+                return true;
+            } catch(NumberFormatException e){
+                return false;
+            }
+        }
 
     public static void main(String[] args) throws ParseException {
         Gramatica parser = new Gramatica(System.in);
@@ -81,7 +140,29 @@ void Clase() :
         ambito = ambito + "." + id.image;
         PilaAmbito1.push(ambito); // Entramos al ámbito de la clase
     }
-        (Metodo() | sentencia())*
+        (
+            // Repetimos intento de métodos y sentencias
+            LOOKAHEAD(2)
+            (
+                try {
+                    Metodo()
+                } catch (ParseException e) {
+                    System.out.println("Error en método dentro de clase");
+                    recuperarError(LLAVE_DER, PARENT_DER, PUBLICO, PRIVADO, PROTEGIDO);
+                } catch (TokenMgrError e) {
+                    recuperarErrorLexico();
+                }
+            |
+                try {
+                    sentencia()
+                } catch (ParseException e) {
+                    System.out.println("Error en sentencia dentro de clase");
+                    recuperarError(PUNTO_COMA, LLAVE_DER, LLAVE_IZQ);
+                } catch (TokenMgrError e) {
+                    recuperarErrorLexico();
+                }
+            )
+        )*
     <LLAVE_DER>
     {
         PilaAmbito1.pop();
@@ -101,16 +182,27 @@ void logProduccion(String nombreProduccion) {
 }
 
 JAVACODE
-void recuperarError(int kind)
-{
-ParseException e = generateParseException();
-         System.err.println(e.toString());
-         ReporteHTML.agregarError(e.toString());
-         Token t;
-         do {
-             t = getNextToken();
-         } while (t.kind != kind && t.kind != EOF);
+void recuperarError(int... tokensFin) {
+    // Capturar el error actual
+    ParseException e = generateParseException();
+    System.err.println(e.toString());
+    ReporteHTML.agregarError(e.toString());
+
+    Token t;
+    boolean encontrado = false;
+
+    while (!encontrado) {
+        t = getNextToken();
+
+        // Verifica si el token actual es uno de los tokens de fin esperados
+        for (int tokenEsperado : tokensFin) {
+            if (t.kind == tokenEsperado || t.kind == EOF) {
+                encontrado = true;
+                break;
+            }
+        }
     }
+}
 
 JAVACODE
 void recuperarErrorLexico() {
@@ -138,28 +230,28 @@ logProduccion("Modificador");
 }
 
 void Metodo() :
-{
-Token id;
-}
-{
-    try {
-    Modificador() tipo_de_dato() id = <IDENTIFICADOR>
-    <PARENT_IZQ>
-    {
-         ambito = ambito + "." + id.image;// por ejemplo, global.MiClase
+ {
+     Token id;
+     boolean esEstatico = false;
+ }
+ {
+     (<PUBLICO> | <PRIVADO> | <PROTEGIDO> )
+     (<ESTATICO>
+     {
+         esEstatico = true;
+     })?
+     tipo_de_dato() id = <IDENTIFICADOR>
+     <PARENT_IZQ>
+     {
+         ambito = ambito + "." + id.image; // por ejemplo, global.MiClase
          PilaAmbito1.push(ambito);
-    }
-    ( Parametros() )? <PARENT_DER> Bloque()
-    {
-            PilaAmbito1.pop();
-            ambito = PilaAmbito1.isEmpty() ? "global" : PilaAmbito1.peek(); // Salimos del ámbito
-        }
-    } catch (ParseException e) {
-                recuperarError(PARENT_DER);
-        } catch (TokenMgrError e) {
-                   recuperarErrorLexico();
-              }
-}
+     }
+     ( Parametros() )? <PARENT_DER> Bloque()
+     {
+         PilaAmbito1.pop();
+         ambito = PilaAmbito1.isEmpty() ? "global" : PilaAmbito1.peek(); // Salimos del ámbito
+     }
+ }
 
 void Parametros() :
 {}
@@ -219,16 +311,23 @@ logProduccion("Bloque");
 void asignacion() :
 {
     Token id;
+    String valorEvaluado;
 }
 {
-{
-logProduccion("asignacion");
-}
+    {
+        logProduccion("asignacion");
+    }
     try {
-        id = <IDENTIFICADOR> <ASIGNACION> expresion() <PUNTO_COMA>
+        id = <IDENTIFICADOR> <ASIGNACION> valorEvaluado = expresion() <PUNTO_COMA>
         {
-            // Aquí decides qué hacer. Ejemplo:
-            System.out.println("Asignación registrada de: " + id.image);
+            String nombreVariable = id.image;
+
+            if (!contiene(nombreVariable, ambito)) {
+                System.err.println("Error: Variable no declarada: " + nombreVariable);
+            } else {
+                actualizarValor(nombreVariable, ambito, valorEvaluado);
+                System.out.println("Variable " + nombreVariable + " actualizada con valor: " + valorEvaluado);
+            }
         }
     } catch (ParseException e) {
         recuperarError(PUNTO_COMA);
@@ -408,6 +507,7 @@ void declaracion():
     Token tipoToken = null;
     Token id = null;
     int tipo = -1;
+    String valorInicial = "nulo";
 }
 {
     {
@@ -426,20 +526,35 @@ void declaracion():
         |
             tipoToken = <BOOLEANO> { tipo = 15; }
         )
+
         id = <IDENTIFICADOR>
+
+        (
+            <ASIGNACION> valorInicial = expresion()
+        )? // ← permite que haya asignación opcional
+
         <PUNTO_COMA>
+
         {
-            pilaAmbitos.add(new Simbolo2(id.image, tipoToken.image, ambito));
-            System.out.println("Declaración registrada: " + tipoToken.image + " " + id.image + " en ámbito " + ambito);
+            if (valorInicial.equals("nulo")) {
+                switch (tipoToken.kind) {
+                    case ENTERO:    valorInicial = "0"; break;
+                    case DOBLE:     valorInicial = "0.0"; break;
+                    case CARACTER:  valorInicial = "'\u0000'"; break;
+                    case CADENA:    valorInicial = "\"\""; break;
+                    case BOOLEANO:  valorInicial = "false"; break;
+                }
+            }
+
+            pilaAmbitos.push(new Simbolo2(id.image, tipoToken.image, ambito, valorInicial));
+            System.out.println("Declaración registrada: " + tipoToken.image + " " + id.image + " en ámbito " + ambito + " Valor=" + valorInicial);
 
             TokenAsignaciones.InsertarSimbolo(id, tipo);
             System.out.println("inserto " + tipoToken.image + " en la tabla de simbolos: " + id.image);
         }
     } catch (ParseException e) {
         if (id != null && tipo != -1) {
-            pilaAmbitos.add(new Simbolo2(id.image, tipoToken.image, ambito));
-            System.out.println("Registro parcial tras error: " + id.image + " en " + ambito);
-
+            pilaAmbitos.push(new Simbolo2(id.image, tipoToken.image, ambito, valorInicial));
             TokenAsignaciones.InsertarSimbolo(id, tipo);
             System.out.println("Registro parcial tras error: " + id.image);
         }
@@ -457,7 +572,7 @@ logProduccion("tipo_de_dato");
 }
 try{
 
-    ( <ENTERO> | <FLOTANTE> | <CADENA> | <BOOLEANO> | <CARACTER> )
+    ( <ENTERO> | <DOBLE> | <CADENA> | <BOOLEANO> | <CARACTER> )
 } catch (ParseException e) {
         recuperarError(PUNTO_COMA);
 } catch (TokenMgrError e) {
@@ -466,39 +581,249 @@ try{
 
 }
 
-void expresion() :
-{}
+String expresion() :
 {
-{
-logProduccion("expresion");
+    String val;
 }
-    try{
-    operando() ( operador() operando() )*
-    } catch (ParseException e) {
-            recuperarError(PUNTO_COMA);
-    } catch (TokenMgrError e) {
-               recuperarErrorLexico();
-          }
+{
+    val = expresionLogica()
+    {
+        return val;
+    }
 }
 
-void operando() :
-{}
+String expresionLogica() :
 {
+    String left, right;
+    String op;
+}
 {
-logProduccion("operando");
+    left = expresionIgualdad()
+    (
+        op = operadorLogico()
+        right = expresionIgualdad()
+        {
+            switch(op) {
+                case "&&": left = "" + (Boolean.parseBoolean(left) && Boolean.parseBoolean(right)); break;
+                case "||": left = "" + (Boolean.parseBoolean(left) || Boolean.parseBoolean(right)); break;
+            }
+        }
+    )*
+    {
+        return left;
+    }
 }
-    try {
-    <IDENTIFICADOR>
-|   <ENTERO_LITERAL>
-|   <CADENA_LITERAL>
-|   <VERDADERO> | <FALSO>
-|   <PARENT_IZQ> expresion() <PARENT_DER>
-    } catch (ParseException e) {
-            recuperarError(PARENT_DER);
-    } catch (TokenMgrError e) {
-               recuperarErrorLexico();
-          }
+
+String expresionIgualdad() :
+{
+    String left, right;
+    String op;
 }
+{
+    left = expresionRelacional()
+    (
+        op = operadorIgualdad()
+        right = expresionRelacional()
+        {
+            if (left == null || right == null) {
+                left = "false"; // o lanza error si quieres detectar el problema
+            } else {
+                switch(op) {
+                    case "==": left = "" + (left.equals(right)); break;
+                    case "!=": left = "" + (!left.equals(right)); break;
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String expresionRelacional() :
+{
+    String left, right;
+    String op;
+}
+{
+   left = expresionAditiva()
+   (
+       op = operadorRelacional()
+       right = expresionAditiva()
+       {
+           if (left == null || right == null) {
+               left = "false"; // o lanza una excepción si deseas parar el análisis
+           } else {
+               try {
+                   int l = Integer.parseInt(left);
+                   int r = Integer.parseInt(right);
+                   switch(op) {
+                       case "<":  left = "" + (l < r); break;
+                       case ">":  left = "" + (l > r); break;
+                       case "<=": left = "" + (l <= r); break;
+                       case ">=": left = "" + (l >= r); break;
+                   }
+               } catch (NumberFormatException e) {
+                   left = "false"; // o un valor por defecto
+               }
+           }
+       }
+   )*
+   {
+       return left;
+   }
+}
+
+String expresionAditiva() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = expresionMultiplicativa()
+    (
+        op = operadorAditivo()
+        right = expresionMultiplicativa()
+        {
+            if (left == null || right == null) {
+                left = "0"; // valor por defecto o lanza error
+            } else if ((left.startsWith("\"") && left.endsWith("\"")) || (right.startsWith("\"") && right.endsWith("\""))) {
+                left = left + right;
+            } else {
+                try {
+                    int l = Integer.parseInt(left);
+                    int r = Integer.parseInt(right);
+                    switch(op) {
+                        case "+": left = "" + (l + r); break;
+                        case "-": left = "" + (l - r); break;
+                    }
+                } catch (NumberFormatException e) {
+                    left = "0"; // o reporta error
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String expresionMultiplicativa() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = primario()
+    (
+        op = operadorMultiplicativo()
+        right = primario()
+        {
+            if (left == null || right == null) {
+                left = "0"; // valor por defecto o error
+            } else {
+                try {
+                    int l = Integer.parseInt(left);
+                    int r = Integer.parseInt(right);
+                    switch(op) {
+                        case "*": left = "" + (l * r); break;
+                        case "/": left = "" + (l / r); break;
+                        case "%": left = "" + (l % r); break;
+                    }
+                } catch (NumberFormatException e) {
+                    left = "0"; // o reporta error
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String primario() :
+{
+    Token t;
+    String val;
+}
+{
+    <PARENT_IZQ> val = expresion() <PARENT_DER> { return val; }
+|
+    t = <ENTERO_LITERAL> { return t.image; }
+|
+    t = <CADENA_LITERAL> { return t.image; }
+|
+    t = <VERDADERO>      { return "true"; }
+|
+    t = <FALSO>          { return "false"; }
+|
+    t = <IDENTIFICADOR> {
+        val = obtenerValor(t.image, ambito);
+        if (val == null) {
+            // Puedes devolver un valor por defecto o lanzar un error controlado
+            // return "0"; // o "null", o "false", según el contexto esperado
+            int Linea = t.beginLine;
+            String token2 = t.image;
+            {
+                System.err.println("Variable no declarada o sin valor: "+ token2 + " en " + Linea);
+            }
+            return "0"; // o el valor neutral que prefieras
+        } else {
+            return val;
+        }
+    }
+}
+
+// Operadores
+
+String operadorAditivo() :
+{
+    Token op;
+}
+{
+    op = <SUMA>   { return op.image; }
+|   op = <RESTA>  { return op.image; }
+}
+
+String operadorMultiplicativo() :
+{
+    Token op;
+}
+{
+    op = <MULTI>  { return op.image; }
+|   op = <DIVI>   { return op.image; }
+|   op = <MODULO> { return op.image; }
+}
+
+String operadorRelacional() :
+{
+    Token op;
+}
+{
+    op = <MENOR_QUE>     { return op.image; }
+|   op = <MAYOR_QUE>     { return op.image; }
+|   op = <MENOR_IGUAL>   { return op.image; }
+|   op = <MAYOR_IGUAL>   { return op.image; }
+}
+
+String operadorIgualdad() :
+{
+    Token op;
+}
+{
+    op = <IGUAL_QUE>     { return op.image; }
+|   op = <NO_IGUAL_QUE>  { return op.image; }
+}
+
+String operadorLogico() :
+{
+    Token op;
+}
+{
+    op = <AND_LOGICA>    { return op.image; }
+|   op = <OR>            { return op.image; }
+}
+
 
 void operador() :
 {}
