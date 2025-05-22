@@ -1,0 +1,1041 @@
+
+options {
+    IGNORE_CASE = true;
+    STATIC = false;
+
+}
+
+
+PARSER_BEGIN(Gramatica)
+package org.example;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Stack;
+
+public class Gramatica {
+    static class Simbolo2 {
+        private String nombre;
+            private String tipo;
+            private String ambito;
+            private String valor; // Agregado
+
+            public Simbolo2(String nombre, String tipo, String ambito, String valor) {
+                this.nombre = nombre;
+                this.tipo = tipo;
+                this.ambito = ambito;
+                this.valor = valor;
+            }
+
+            public String getValor() {
+                    return valor;
+                }
+
+                public void setValor(String valor) {
+                    this.valor = valor;
+                }
+
+                public String getNombre() {
+                        return nombre;
+                }
+
+                 public String getAmbito() {
+                        return ambito;
+                }
+
+        public String toString() {
+            return nombre + " - " + tipo + " - " + ambito;
+        }
+    }
+
+    static String ambito = "global";
+    static Stack<Simbolo2> pilaAmbitos = new Stack<Simbolo2>();
+    static Stack<String> PilaAmbito1 = new Stack<String>();
+
+    public static void imprimirTablaSimbolos() {
+        for (Simbolo2 s : pilaAmbitos) {
+            System.out.println(s);
+        }
+    }
+
+    public String obtenerValor(String nombre, String ambito) {
+        for (Simbolo2 s : pilaAmbitos) {
+            if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                return s.getValor();
+            }
+        }
+
+        // Si no se encuentra, registrar el error
+       System.err.println("Variable no declarada o sin valor: " + nombre + " en el ámbito: " + ambito);
+
+        // Retornar valor neutro (según contexto)
+        return "0"; // o "\"\"" si esperas cadenas, o "false" si esperas booleanos
+    }
+
+    public void actualizarValor(String nombre, String ambito, String nuevoValor) {
+            for (Simbolo2 s : pilaAmbitos) {
+                if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                    s.setValor(nuevoValor);
+                    return;
+                }
+            }
+            System.out.println("⚠ Error: Variable no declarada en el ámbito: " + nombre);
+        }
+
+    public boolean contiene(String nombre, String ambito) {
+            for (Simbolo2 s : pilaAmbitos) {
+                if (s.getNombre().equals(nombre) && s.getAmbito().equals(ambito)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean isNumeric(String str) {
+            try {
+                Integer.parseInt(str);
+                return true;
+            } catch(NumberFormatException e){
+                return false;
+            }
+        }
+
+    public static void main(String[] args) throws ParseException {
+        Gramatica parser = new Gramatica(System.in);
+        parser.Inicio();
+        imprimirTablaSimbolos();
+    }
+}
+PARSER_END(Gramatica)
+
+
+void Inicio() :
+{}
+{
+    ( instruccion() )*
+    <EOF>
+}
+
+void instruccion() :
+{}
+{
+    Clase()
+  |
+    declaracion()
+  |
+    sentencia()
+}
+
+void Clase() :
+{
+    Token id;
+}
+{
+    {
+        logProduccion("Clase");
+    }
+    try {
+    (Modificador())* <CLASE> id = <IDENTIFICADOR> <LLAVE_IZQ>
+    {
+        ambito = ambito + "." + id.image;
+        PilaAmbito1.push(ambito); // Entramos al ámbito de la clase
+    }
+        (
+            // Repetimos intento de métodos y sentencias
+            LOOKAHEAD(2)
+            (
+                try {
+                    Metodo()
+                } catch (ParseException e) {
+                    System.out.println("Error en método dentro de clase");
+                    recuperarError(LLAVE_DER, PARENT_DER, PUBLICO, PRIVADO, PROTEGIDO);
+                } catch (TokenMgrError e) {
+                    recuperarErrorLexico();
+                }
+            |
+                try {
+                    sentencia()
+                } catch (ParseException e) {
+                    System.out.println("Error en sentencia dentro de clase");
+                    recuperarError(PUNTO_COMA, LLAVE_DER, LLAVE_IZQ);
+                } catch (TokenMgrError e) {
+                    recuperarErrorLexico();
+                }
+            )
+        )*
+    <LLAVE_DER>
+    {
+        PilaAmbito1.pop();
+        ambito = PilaAmbito1.isEmpty() ? "global" : PilaAmbito1.peek(); // Salimos del ámbito de la clase
+    }
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+JAVACODE
+void logProduccion(String nombreProduccion) {
+    Token t = getToken(1);
+    System.out.println("Entrando a " + nombreProduccion + " en línea: " + t.beginLine + ", columna: " + t.beginColumn);
+}
+
+JAVACODE
+void recuperarError(int... tokensFin) {
+    // Capturar el error actual
+    ParseException e = generateParseException();
+    System.err.println(e.toString());
+    ReporteHTML.agregarError(e.toString());
+
+    Token t;
+    boolean encontrado = false;
+
+    while (!encontrado) {
+        t = getNextToken();
+
+        // Verifica si el token actual es uno de los tokens de fin esperados
+        for (int tokenEsperado : tokensFin) {
+            if (t.kind == tokenEsperado || t.kind == EOF) {
+                encontrado = true;
+                break;
+            }
+        }
+    }
+}
+
+JAVACODE
+void recuperarErrorLexico() {
+    Token t;
+    do {
+        t = getNextToken();
+    } while (t.kind != PUNTO_COMA && t.kind != LLAVE_DER && t.kind != EOF);
+}
+
+
+
+void Modificador() :
+{}
+{
+{
+logProduccion("Modificador");
+}
+    try {
+    <PUBLICO> | <PRIVADO> | <PROTEGIDO> | <ESTATICO>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void Metodo() :
+ {
+     Token id;
+     boolean esEstatico = false;
+ }
+ {
+     (<PUBLICO> | <PRIVADO> | <PROTEGIDO> )
+     (<ESTATICO>
+     {
+         esEstatico = true;
+     })?
+     tipo_de_dato() id = <IDENTIFICADOR>
+     <PARENT_IZQ>
+     {
+         ambito = ambito + "." + id.image; // por ejemplo, global.MiClase
+         PilaAmbito1.push(ambito);
+     }
+     ( Parametros() )? <PARENT_DER> Bloque()
+     {
+         PilaAmbito1.pop();
+         ambito = PilaAmbito1.isEmpty() ? "global" : PilaAmbito1.peek(); // Salimos del ámbito
+     }
+ }
+
+void Parametros() :
+{}
+{
+{
+logProduccion("Parametros");
+}
+    try {
+    tipo_de_dato() <IDENTIFICADOR> (<ARRAY_IZQ> <ARRAY_DER>)? (<COMA> tipo_de_dato() <IDENTIFICADOR> (<ARRAY_IZQ> <ARRAY_DER>)?)*
+    } catch (ParseException e) {
+            recuperarError(ARRAY_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void sentencia() :
+{}
+{
+{
+logProduccion("sentencia");
+}
+    try {
+        declaracion()
+      | asignacion()
+      | si()
+      | mientras()
+      | para()
+      | imprimir()
+      | Metodo()
+      | Bloque()
+      | hacer()
+      | seleccion()
+    } catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+         recuperarErrorLexico();
+    }
+
+}
+
+void Bloque() :
+{}
+{
+{
+logProduccion("Bloque");
+}
+    try{
+    <LLAVE_IZQ> (declaracion() | sentencia())*  <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void asignacion() :
+{
+    Token id;
+    String valorEvaluado;
+}
+{
+    {
+        logProduccion("asignacion");
+    }
+    try {
+        id = <IDENTIFICADOR> <ASIGNACION> valorEvaluado = expresion() <PUNTO_COMA>
+        {
+            String nombreVariable = id.image;
+
+            if (!contiene(nombreVariable, ambito)) {
+                System.err.println("Error: Variable no declarada: " + nombreVariable);
+            } else {
+                actualizarValor(nombreVariable, ambito, valorEvaluado);
+                System.out.println("Variable " + nombreVariable + " actualizada con valor: " + valorEvaluado);
+            }
+        }
+    } catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+        recuperarErrorLexico();
+    }
+}
+
+void imprimir() :
+{}
+{
+{
+logProduccion("imprimir");
+}
+    try {
+    <IMPRIMIR> <PARENT_IZQ> expresion() <PARENT_DER> <PUNTO_COMA>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void si():
+{}
+{
+{
+logProduccion("si");
+}
+    try {
+    <SI> <PARENT_IZQ> expresion() <PARENT_DER> cuerpo_si()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_si()  :
+{}
+{
+{
+logProduccion("cuerpo_si");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    [ <SI_NO> <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER> ]
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void mientras() :
+{}
+{
+{
+logProduccion("mientras");
+}
+    try {
+    <MIENTRAS> <PARENT_IZQ> expresion() <PARENT_DER> cuerpo_mientras()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_mientras() :
+{}
+{
+{
+logProduccion("cuerpo_mientras");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void para() :
+{}
+{
+{
+logProduccion("para");
+}
+    try {
+    <PARA> <PARENT_IZQ> asignacion()  expresion() <PUNTO_COMA> asignacion() <PARENT_DER> cuerpo_para()
+    } catch (ParseException e) {
+            recuperarError(PARENT_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void cuerpo_para() :
+{}
+{
+{
+logProduccion("cuerpo_para");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+ } catch (ParseException e) {
+         recuperarError(LLAVE_DER);
+ } catch (TokenMgrError e) {
+            recuperarErrorLexico();
+       }
+}
+
+void hacer() :
+{}
+{
+{
+logProduccion("hacer");
+}
+    try {
+    <HACER> cuerpo_hacer() <MIENTRAS> <PARENT_IZQ> expresion() <PARENT_DER> <PUNTO_COMA>
+    } catch (ParseException e) {
+            recuperarError(PUNTO_COMA);
+    }catch (TokenMgrError e) {
+              recuperarErrorLexico();
+         }
+}
+
+void cuerpo_hacer() :
+{}
+{
+{
+logProduccion("cuerpo_hacer");
+}
+    try{
+    <LLAVE_IZQ> ( sentencia() )* <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void seleccion():
+{}
+{
+{
+logProduccion("seleccion");
+}
+    try {
+    <SWITCH> <PARENT_IZQ> expresion() <PARENT_DER>
+    <LLAVE_IZQ>
+        (
+            <CASO> expresion() <DOS_PUNTOS>
+            (sentencia())*
+        )*
+        [ <DEFECTO> <DOS_PUNTOS> (sentencia())* ]
+    <LLAVE_DER>
+    } catch (ParseException e) {
+            recuperarError(LLAVE_DER);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+void SITUACION() :
+{}
+{
+
+    <CASO> expresion() <DOS_PUNTOS> ( sentencia() )*
+
+}
+
+void declaracion():
+{
+    Token tipoToken = null;
+    Token id = null;
+    int tipo = -1;
+    String valorInicial = "nulo";
+}
+{
+    {
+        logProduccion("declaracion");
+    }
+
+    try {
+        (
+            tipoToken = <ENTERO>   { tipo = 39; }
+        |
+            tipoToken = <DOBLE>    { tipo = 26; }
+        |
+            tipoToken = <CARACTER> { tipo = 20; }
+        |
+            tipoToken = <CADENA>   { tipo = 57; }
+        |
+            tipoToken = <BOOLEANO> { tipo = 15; }
+        )
+
+        {
+        switch (tipoToken.kind) {
+            case ENTERO:
+                valorInicial = "0";
+                break;
+            case DOBLE:
+                valorInicial = "0.0";
+                break;
+            case CARACTER:
+                valorInicial = "'\u0000'";
+                break;
+            case CADENA:
+                valorInicial = "\"\"";
+                break;
+            case BOOLEANO:
+                valorInicial = "false";
+                break;
+        }
+        }
+        id = <IDENTIFICADOR>
+        <PUNTO_COMA>
+        {
+             // o "0", "0.0", "false", "", etc. según tipoToken.image
+
+            pilaAmbitos.push(new Simbolo2(id.image, tipoToken.image, ambito, valorInicial));
+            System.out.println("Declaración registrada: " + tipoToken.image + " " + id.image + " en ámbito " + ambito + " Valor" + valorInicial);
+
+            TokenAsignaciones.InsertarSimbolo(id, tipo);
+            System.out.println("inserto " + tipoToken.image + " en la tabla de simbolos: " + id.image);
+        }
+    } catch (ParseException e) {
+        if (id != null && tipo != -1) {
+            pilaAmbitos.push(new Simbolo2(id.image, tipoToken.image, ambito, valorInicial));
+            System.out.println("Registro parcial tras error: " + id.image + " en " + ambito + " Valor" + valorInicial);
+
+            TokenAsignaciones.InsertarSimbolo(id, tipo);
+            System.out.println("Registro parcial tras error: " + id.image);
+        }
+        recuperarError(PUNTO_COMA);
+    } catch (TokenMgrError e) {
+        recuperarErrorLexico();
+    }
+}
+
+void tipo_de_dato() :
+{}
+{
+{
+logProduccion("tipo_de_dato");
+}
+try{
+
+    ( <ENTERO> | <DOBLE> | <CADENA> | <BOOLEANO> | <CARACTER> )
+} catch (ParseException e) {
+        recuperarError(PUNTO_COMA);
+} catch (TokenMgrError e) {
+           recuperarErrorLexico();
+      }
+
+}
+
+String expresion() :
+{
+    String val;
+}
+{
+    val = expresionLogica()
+    {
+        return val;
+    }
+}
+
+String expresionLogica() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = expresionIgualdad()
+    (
+        op = operadorLogico()
+        right = expresionIgualdad()
+        {
+            switch(op) {
+                case "&&": left = "" + (Boolean.parseBoolean(left) && Boolean.parseBoolean(right)); break;
+                case "||": left = "" + (Boolean.parseBoolean(left) || Boolean.parseBoolean(right)); break;
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String expresionIgualdad() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = expresionRelacional()
+    (
+        op = operadorIgualdad()
+        right = expresionRelacional()
+        {
+            if (left == null || right == null) {
+                left = "false"; // o lanza error si quieres detectar el problema
+            } else {
+                switch(op) {
+                    case "==": left = "" + (left.equals(right)); break;
+                    case "!=": left = "" + (!left.equals(right)); break;
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String expresionRelacional() :
+{
+    String left, right;
+    String op;
+}
+{
+   left = expresionAditiva()
+   (
+       op = operadorRelacional()
+       right = expresionAditiva()
+       {
+           if (left == null || right == null) {
+               left = "false"; // o lanza una excepción si deseas parar el análisis
+           } else {
+               try {
+                   int l = Integer.parseInt(left);
+                   int r = Integer.parseInt(right);
+                   switch(op) {
+                       case "<":  left = "" + (l < r); break;
+                       case ">":  left = "" + (l > r); break;
+                       case "<=": left = "" + (l <= r); break;
+                       case ">=": left = "" + (l >= r); break;
+                   }
+               } catch (NumberFormatException e) {
+                   left = "false"; // o un valor por defecto
+               }
+           }
+       }
+   )*
+   {
+       return left;
+   }
+}
+
+String expresionAditiva() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = expresionMultiplicativa()
+    (
+        op = operadorAditivo()
+        right = expresionMultiplicativa()
+        {
+            if (left == null || right == null) {
+                left = "0"; // valor por defecto o lanza error
+            } else if ((left.startsWith("\"") && left.endsWith("\"")) || (right.startsWith("\"") && right.endsWith("\""))) {
+                left = left + right;
+            } else {
+                try {
+                    int l = Integer.parseInt(left);
+                    int r = Integer.parseInt(right);
+                    switch(op) {
+                        case "+": left = "" + (l + r); break;
+                        case "-": left = "" + (l - r); break;
+                    }
+                } catch (NumberFormatException e) {
+                    left = "0"; // o reporta error
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String expresionMultiplicativa() :
+{
+    String left, right;
+    String op;
+}
+{
+    left = primario()
+    (
+        op = operadorMultiplicativo()
+        right = primario()
+        {
+            if (left == null || right == null) {
+                left = "0"; // valor por defecto o error
+            } else {
+                try {
+                    int l = Integer.parseInt(left);
+                    int r = Integer.parseInt(right);
+                    switch(op) {
+                        case "*": left = "" + (l * r); break;
+                        case "/": left = "" + (l / r); break;
+                        case "%": left = "" + (l % r); break;
+                    }
+                } catch (NumberFormatException e) {
+                    left = "0"; // o reporta error
+                }
+            }
+        }
+    )*
+    {
+        return left;
+    }
+}
+
+String primario() :
+{
+    Token t;
+    String val;
+}
+{
+    <PARENT_IZQ> val = expresion() <PARENT_DER> { return val; }
+|
+    t = <ENTERO_LITERAL> { return t.image; }
+|
+    t = <CADENA_LITERAL> { return t.image; }
+|
+    t = <VERDADERO>      { return "true"; }
+|
+    t = <FALSO>          { return "false"; }
+|
+    t = <IDENTIFICADOR> {
+        val = obtenerValor(t.image, ambito);
+        if (val == null) {
+            // Puedes devolver un valor por defecto o lanzar un error controlado
+            // return "0"; // o "null", o "false", según el contexto esperado
+            int Linea = t.beginLine;
+            String token2 = t.image;
+            {
+                System.err.println("Variable no declarada o sin valor: "+ token2 + " en " + Linea);
+            }
+            return "0"; // o el valor neutral que prefieras
+        } else {
+            return val;
+        }
+    }
+}
+
+// Operadores
+
+String operadorAditivo() :
+{
+    Token op;
+}
+{
+    op = <SUMA>   { return op.image; }
+|   op = <RESTA>  { return op.image; }
+}
+
+String operadorMultiplicativo() :
+{
+    Token op;
+}
+{
+    op = <MULTI>  { return op.image; }
+|   op = <DIVI>   { return op.image; }
+|   op = <MODULO> { return op.image; }
+}
+
+String operadorRelacional() :
+{
+    Token op;
+}
+{
+    op = <MENOR_QUE>     { return op.image; }
+|   op = <MAYOR_QUE>     { return op.image; }
+|   op = <MENOR_IGUAL>   { return op.image; }
+|   op = <MAYOR_IGUAL>   { return op.image; }
+}
+
+String operadorIgualdad() :
+{
+    Token op;
+}
+{
+    op = <IGUAL_QUE>     { return op.image; }
+|   op = <NO_IGUAL_QUE>  { return op.image; }
+}
+
+String operadorLogico() :
+{
+    Token op;
+}
+{
+    op = <AND_LOGICA>    { return op.image; }
+|   op = <OR>            { return op.image; }
+}
+
+
+void operador() :
+{}
+{
+{
+logProduccion("operador");
+}
+    try {
+    <SUMA> | <RESTA> | <MULTI> | <DIVI> | <MODULO>
+|   <IGUAL_QUE> | <NO_IGUAL_QUE> | <MENOR_QUE> | <MAYOR_QUE> | <MENOR_IGUAL> | <MAYOR_IGUAL>
+|   <AND_LOGICA> | <OR> | <NEGACION> | <ASIGNACION>
+    } catch (ParseException e) {
+            recuperarError(ASIGNACION);
+    } catch (TokenMgrError e) {
+               recuperarErrorLexico();
+          }
+}
+
+/* Analizador léxico para Java */
+
+SKIP :  /* secuencias de escape */
+{
+    " "
+|   "\r"
+|   "\t"
+|   "\n"
+|   "\b"
+|   "\f"
+|   "\""
+|   "\'"
+|   "\\"
+}
+
+SKIP : /* Comentarios de bloque */
+{
+    "/*" : DentroComentario
+}
+
+<DentroComentario> SKIP :
+{
+    "*/" : DEFAULT
+}
+
+<DentroComentario> MORE :
+{
+    <~["*"]> // Cualquier cosa que no sea el cierre del comentario.
+}
+
+/* Palabras Reservadas */
+TOKEN :
+{
+  <ABSTRACTO: "abstracto">
+| <AFIRMAR: "afirmar">
+| <BOOLEANO: "booleano">
+| <ROMPER: "romper">
+| <BYTE: "byte">
+| <CASO: "caso">
+| <CAPTURAR: "capturar">
+| <CARACTER: "caracter">
+| <CLASE: "clase">
+| <CONSTANTE: "constante">
+| <CONTINUAR: "continuar">
+| <POR_DEFECTO: "por_defecto">
+| <HACER: "hacer">
+| <DOBLE: "doble">
+| <SI_NO: "si_no">
+| <ENUMERAR: "enumerar">
+| <EXTENDER: "extender">
+| <FINAL: "final">
+| <FINALMENTE: "finalmente">
+| <FLOTANTE: "flotante">
+| <PARA: "para">
+| <IR_A: "ir_a">
+| <SI: "si">
+| <IMPLEMENTAR: "implementar">
+| <IMPORTAR: "importar">
+| <INSTANCIAR: "instanciar">
+| <ENTERO: "entero">
+| <INTERFAZ: "interfaz">
+| <LARGO: "largo">
+| <PRINCIPAL: "principal">
+| <NATIVO: "nativo">
+| <NUEVO: "nuevo">
+| <AFUERA: "afuera">
+| <PAQUETE: "paquete">
+| <PRIVADO: "privado">
+| <PROTEGIDO: "protegido">
+| <PUBLICO: "publico">
+| <IMPRIMIR: "imprimir">
+| <IMPRIMIR_LINEA: "imprimir_linea">
+| <REGRESAR: "regresar">
+| <CORTO: "corto">
+| <ESTATICO: "statico">
+| <SISTEMA: "sistema">
+| <CADENA: "cadena">
+| <SUPER: "super">
+| <ESCANEAR: "escanear">
+| <OPCIONES: "opciones">
+| <SYNCHRONIZAR: "sincronizar">
+| <ESTO: "esto">
+| <TIRAR: "tirar">
+| <TIRAR_EXCEPCION: "throws">
+| <TRANSITORIO: "transitorio">
+| <INTENTAR: "intentar">
+| <VAR: "var">
+| <VACIO: "vacio">
+| <VOLATIL: "volátil">
+| <MIENTRAS: "mientras">
+| <SWITCH: "switch">
+| <DEFECTO: "defecto">
+}
+
+/* Palabras Clave context-sensitive */
+TOKEN :
+{
+  <ABRIR: "abrir">
+| <EXPORTAR: "exportar">
+| <MODULAR: "modular">
+| <REQUERIR: "requerir">
+| <TRANSITIVO: "transitivo">
+| <ABRIRS: "abrirse">
+| <A: "a">
+| <USAR: "usar">
+| <PROVEER: "proveer">
+| <CON: "con">
+}
+
+/* Literales reservados */
+TOKEN :
+{
+  <VERDADERO: "verdadero">
+| <FALSO: "falso">
+| <NULO: "nulo">
+}
+
+/* Puntuación */
+TOKEN :
+{
+  <LLAVE_IZQ: "{">
+| <LLAVE_DER: "}">
+| <PARENT_IZQ: "(">
+| <PARENT_DER: ")">
+| <ARRAY_IZQ: "[">
+| <ARRAY_DER: "]">
+| <PUNTO_COMA: ";">
+| <PUNTO: ".">
+| <COMA: ",">
+| <DOS_PUNTOS: ":">
+}
+
+TOKEN : /* Operadores */
+{
+  // Aritméticos
+  <SUMA: "+">
+| <RESTA: "-">
+| <MULTI: "*">
+| <DIVI: "/">
+| <MODULO: "%">
+
+  // Asignación
+| <ASIGNACION: "=">
+
+  // Unarios
+| <INCREMENTO: "++">
+| <DECREMENTO: "--">
+| <COMPL_BINARIO: "~">
+
+  // Aritméticos combinados
+| <SUMA_COMBINADA: "+=">
+| <RESTA_COMBINADA: "-=">
+| <PRODUCTO_COMBINADO: "*=">
+| <DIVISION_COMBINADA: "/=">
+| <RESTO_COMBINADO: "%=">
+
+  // Relacionales
+| <IGUAL_QUE: "==">
+| <NO_IGUAL_QUE: "!=">
+| <MENOR_QUE: "<">
+| <MAYOR_QUE: ">">
+| <MENOR_IGUAL: "<=">
+| <MAYOR_IGUAL: ">=">
+
+  // Lógicos o booleanos
+| <NEGACION: "!">
+| <OR: "||">
+| <XOR: "^">
+| <AND: "&">
+| <SUMA_LOGICA: "|">
+| <AND_LOGICA: "&&">
+
+  // Bitwise
+| <DESPLAZAMIENTO_IZQ: "<<">
+| <DESPLAZAMIENTO_DER: ">>">
+}
+
+// IDENTIFICADORES
+TOKEN: // IDENTIFICADORES
+{
+<IDENTIFICADOR: (["a"-"z", "A"-"Z", "_"]) (["a"-"z", "A"-"Z", "0"-"9", "_"])*>
+}
+
+TOKEN: // Literales numéricos y cadenas
+{
+    <ENTERO_LITERAL: (["0"-"9"])+>
+|   <CADENA_LITERAL: "\"" ( "\\" | ~["\\", "\""] )* "\"" >
+
+}
+
